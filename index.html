@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dividend Screener v5 Dashboard</title>
+<link href="https://fonts.googleapis.com/css?family=Raleway:300,400,600,700" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<style>
+:root {
+  --bg: #000000;
+  --card: #111111;
+  --elevated: #1a1a1a;
+  --text: #ffffff;
+  --muted: #888888;
+  --accent: #ffffff;
+  --core: #ffffff;
+  --satellite: #aaaaaa;
+  --watchlist: #888888;
+  --avoid: #666666;
+  --border: #333333;
+  --border-light: #444444;
+  --glow-core: rgba(255,255,255,0.1);
+  --glow-satellite: rgba(170,170,170,0.1);
+  --glow-watchlist: rgba(136,136,136,0.1);
+  --glow-avoid: rgba(102,102,102,0.1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Raleway', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Stats bar — inline strip above filter */
+.stats-bar {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 2rem;
+  flex-wrap: wrap;
+  align-items: center;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.stat-card {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.2rem 0;
+}
+.stat-card .label {
+  font-size: 0.65rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+.stat-card .value {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.stat-card.core .value { color: var(--core); }
+.stat-card.satellite .value { color: var(--satellite); }
+.stat-card.watchlist .value { color: var(--watchlist); }
+.stat-card.avoid .value { color: var(--avoid); }
+
+.hidden { display: none !important; }
+
+/* Filter bar */
+.filter-bar {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem 2rem;
+  align-items: center;
+  flex-wrap: wrap;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.filter-group { display: flex; align-items: center; gap: 0.5rem; }
+.filter-group label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+.filter-pills {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.filter-pill {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+.filter-pill:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
+.filter-pill.active {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
+.filter-group input[type="range"] {
+  width: 120px;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  background: var(--border);
+}
+.filter-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text);
+  cursor: pointer;
+}
+.filter-group input[type="text"] {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.4rem 0.75rem;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-family: 'Raleway', sans-serif;
+}
+.filter-group input[type="text"]:focus {
+  border-color: var(--text);
+  outline: none;
+}
+.filter-group select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.4rem 0.75rem;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-family: 'Raleway', sans-serif;
+  cursor: pointer;
+}
+
+/* Compare bar */
+.compare-bar {
+  display: none;
+  padding: 0.75rem 2rem;
+  background: var(--elevated);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  gap: 1rem;
+}
+.compare-bar.visible { display: flex; }
+.compare-bar .compare-tickers { display: flex; gap: 0.5rem; }
+.compare-ticker-tag {
+  background: var(--text);
+  color: var(--bg);
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.compare-btn {
+  background: var(--text);
+  border: none;
+  color: var(--bg);
+  padding: 0.4rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: 'Raleway', sans-serif;
+}
+.compare-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.clear-compare {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 0.4rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-family: 'Raleway', sans-serif;
+}
+.clear-compare:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
+
+/* Table */
+.table-wrap { padding: 0 2rem 2rem; }
+.table-container {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-header {
+  display: flex;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  background: var(--elevated);
+  letter-spacing: 1px;
+  min-width: 700px;
+}
+.table-header > div { flex: 1; display: flex; align-items: center; }
+.table-header .col-check { flex: 0 0 32px; }
+.table-header .col-ticker { flex: 0 0 90px; }
+.table-header .col-name { flex: 2; }
+.table-header .col-score { flex: 0 0 100px; }
+.table-header .col-tier { flex: 0 0 100px; text-align: center; }
+.table-header .col-signal { flex: 0 0 90px; text-align: center; }
+.table-header .col-tech { flex: 0 0 70px; text-align: center; }
+.table-header .col-price { flex: 0 0 90px; text-align: right; }
+
+.table-row {
+  display: flex;
+  padding: 0.6rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.875rem;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+  min-width: 700px;
+}
+.table-row:hover, .table-row:focus-visible {
+  background: rgba(255,255,255,0.04);
+  outline: none;
+}
+.table-row.selected {
+  background: rgba(255,255,255,0.06);
+}
+.table-row:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+.table-row > div { flex: 1; display: flex; align-items: center; }
+.table-row .col-check { flex: 0 0 32px; }
+.table-row .col-ticker { flex: 0 0 90px; font-weight: 700; color: var(--text); gap: 0.4rem; }
+.table-row .col-name { flex: 2; color: var(--text); font-weight: 400; }
+.table-row .col-score { flex: 0 0 100px; }
+.table-row .col-tier { flex: 0 0 100px; justify-content: center; }
+.table-row .col-signal { flex: 0 0 90px; justify-content: center; }
+.table-row .col-tech { flex: 0 0 70px; justify-content: center; font-weight: 600; }
+.table-row .col-price { flex: 0 0 90px; justify-content: flex-end; font-family: monospace; color: var(--muted); font-weight: 500; }
+
+/* Score bar */
+.score-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+.score-bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--bg);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.score-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+.score-bar-text { font-size: 0.8rem; font-weight: 700; min-width: 28px; }
+
+/* Tier badge */
+.tier-badge {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.tier-core { background: rgba(255,255,255,0.1); color: var(--text); border: 1px solid rgba(255,255,255,0.2); }
+.tier-satellite { background: rgba(170,170,170,0.1); color: var(--satellite); border: 1px solid rgba(170,170,170,0.2); }
+.tier-watchlist { background: rgba(136,136,136,0.1); color: var(--watchlist); border: 1px solid rgba(136,136,136,0.2); }
+.tier-avoid { background: rgba(102,102,102,0.1); color: var(--avoid); border: 1px solid rgba(102,102,102,0.2); }
+
+/* Signal */
+.signal-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 0.4rem;
+}
+.signal-strengthened .signal-dot { background: var(--text); }
+.signal-weakened .signal-dot { background: var(--watchlist); }
+.signal-falsified .signal-dot { background: var(--avoid); }
+.signal-none .signal-dot { background: var(--muted); }
+.signal-watch .signal-dot { background: var(--satellite); }
+.signal-stable .signal-dot { background: var(--text); }
+.signal-text { font-size: 0.75rem; font-weight: 500; }
+
+/* Report icon */
+.report-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+.report-icon.has-report { opacity: 1; color: var(--text); }
+
+/* Quick preview card - fixed positioning */
+.preview-card {
+  display: none;
+  position: fixed;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  width: 260px;
+  z-index: 300;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+  pointer-events: none;
+}
+.preview-card.visible { display: block; }
+.preview-card h4 { font-size: 0.9rem; margin-bottom: 0.5rem; font-weight: 700; }
+.preview-card .preview-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+.preview-metric { text-align: center; padding: 0.4rem; background: var(--bg); border-radius: 4px; }
+.preview-metric .label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; font-weight: 600; }
+.preview-metric .value { font-size: 1rem; font-weight: 700; margin-top: 0.2rem; }
+.preview-thesis {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.5;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+
+/* Full page detail view */
+.detail-view {
+  display: none;
+  min-height: 100vh;
+  background: var(--bg);
+}
+.detail-view.active { display: block; }
+/* Detail view nav */
+.detail-nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 2rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.detail-nav .back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: 'Raleway', sans-serif;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.detail-nav .back-btn:hover { border-color: var(--text); }
+.detail-nav .back-btn svg { width: 16px; height: 16px; }
+.detail-nav .nav-title {
+  flex: 1;
+  min-width: 0;
+}
+.detail-nav .nav-title h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.detail-nav .nav-title .detail-meta {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 0.15rem;
+}
+.detail-nav .nav-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.detail-nav .nav-actions .detail-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: 'Raleway', sans-serif;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.detail-nav .nav-actions .detail-btn:hover { border-color: var(--text); }
+.detail-nav .nav-actions .detail-btn.primary {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
+.detail-nav .nav-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: color 0.2s;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  margin-left: 0.25rem;
+}
+.detail-nav .nav-close:hover { color: var(--text); }
+
+.detail-body {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem 2rem;
+}
+
+/* Chart container */
+.chart-container {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  height: 300px;
+}
+.chart-container canvas {
+  max-height: 280px;
+}
+
+/* Pillar scores */
+.pillar-scores {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.pillar-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+.pillar-box .label { font-size: 0.7rem; color: var(--muted); margin-bottom: 0.4rem; text-transform: uppercase; font-weight: 600; }
+.pillar-box .score { font-size: 1.5rem; font-weight: 700; }
+.pillar-box .bar-track {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 0.5rem;
+  overflow: hidden;
+}
+.pillar-box .bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--text);
+}
+
+/* Accordion */
+.accordion-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+  background: var(--card);
+}
+.accordion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.875rem 1.25rem;
+  background: var(--elevated);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.accordion-header:hover { background: rgba(255,255,255,0.04); }
+.accordion-header h3 { font-size: 0.9rem; font-weight: 700; }
+.accordion-header .accordion-icon { color: var(--muted); transition: transform 0.2s; font-size: 0.8rem; }
+.accordion-item.open .accordion-icon { transform: rotate(180deg); }
+.accordion-content {
+  display: none;
+  padding: 1.25rem;
+  background: var(--bg);
+}
+.accordion-item.open .accordion-content { display: block; }
+
+/* Markdown content */
+.markdown-content {
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--text);
+}
+.markdown-content h1 { font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; margin-bottom: 0.75rem; font-weight: 700; }
+.markdown-content h2 { font-size: 1rem; color: var(--text); margin: 1rem 0 0.5rem; font-weight: 700; }
+.markdown-content h3 { font-size: 0.9rem; margin: 0.75rem 0 0.4rem; font-weight: 600; }
+.markdown-content p { margin-bottom: 0.5rem; }
+.markdown-content ul, .markdown-content ol { margin-bottom: 0.5rem; padding-left: 1.25rem; }
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+}
+.markdown-content th, .markdown-content td {
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.5rem;
+  text-align: left;
+}
+.markdown-content th { background: var(--card); font-weight: 700; color: var(--muted); }
+.markdown-content tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+.markdown-content blockquote {
+  border-left: 3px solid var(--text);
+  margin: 0.5rem 0;
+  padding: 0.4rem 0.75rem;
+  background: rgba(255,255,255,0.03);
+  color: var(--muted);
+}
+
+/* Comparison view */
+.comparison-view {
+  display: none;
+  padding: 1.25rem 2rem;
+}
+.comparison-view.active { display: block; }
+.comparison-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.comparison-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+.comparison-card h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .stats-bar { padding: 0.75rem 1rem; gap: 0.5rem; }
+  .filter-bar { flex-direction: column; align-items: stretch; padding: 1rem; gap: 0.75rem; }
+  .filter-group { width: 100%; }
+  .table-wrap { padding: 0 1rem 1rem; }
+  .table-header .col-name, .table-row .col-name { display: none; }
+  .pillar-scores { grid-template-columns: repeat(2, 1fr); }
+  .preview-card { display: none !important; }
+  .comparison-view { padding: 1rem; }
+  .detail-body { padding: 1rem; }
+  .detail-header { padding: 1rem; }
+  .detail-nav { padding: 1rem; flex-wrap: wrap; }
+  .detail-nav .nav-title { order: 3; width: 100%; margin-top: 0.5rem; }
+  .detail-nav .nav-title h2 { font-size: 1rem; }
+  .chart-container { height: 220px; padding: 0.5rem; }
+  .chart-container canvas { max-height: 200px; }
+}
+
+/* Sort indicator */
+.table-header > div.sorted::after {
+  content: ' ↓';
+  color: var(--text);
+  font-weight: 700;
+}
+.table-header > div.sorted.asc::after {
+  content: ' ↑';
+}
+*:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+/* Screener view hidden state */
+.screener-view.hidden { display: none; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* Checkbox */
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--text);
+  cursor: pointer;
+}
+
+/* Empty state button */
+.empty-state-btn {
+  background: var(--text);
+  border: none;
+  color: var(--bg);
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: 'Raleway', sans-serif;
+  font-weight: 600;
+}
+
+@keyframes loadSlide {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(150%); }
+  100% { transform: translateX(-100%); }
+}
+</style>
+</head>
+<body>
+
+<div class="stats-bar" id="statsBar"></div>
+
+<div class="filter-bar" id="filterBar">
+  <div class="filter-group">
+    <label>Tier</label>
+    <div class="filter-pills" id="filterTierPills"></div>
+  </div>
+  <div class="filter-group">
+    <label>Country</label>
+    <div class="filter-pills" id="filterCountryPills"></div>
+  </div>
+  <div class="filter-group">
+    <label>Score ≥</label>
+    <input type="range" id="filterScoreMin" min="0" max="5" step="0.1" value="0">
+    <span id="scoreMinVal" style="color:var(--muted);font-size:0.8rem;">0</span>
+  </div>
+  <div class="filter-group">
+    <label>Signal</label>
+    <select id="filterSignal">
+      <option value="">All</option>
+      <option value="STRENGTHENED">Strengthened</option>
+      <option value="WEAKENED">Weakened</option>
+      <option value="NONE">None</option>
+      <option value="WATCH">Watch</option>
+      <option value="STABLE">Stable</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Search</label>
+    <input type="text" id="filterSearch" placeholder="Ticker or name...">
+  </div>
+</div>
+
+<div class="compare-bar" id="compareBar">
+  <span style="color:var(--muted);font-size:0.8rem;">Compare:</span>
+  <div class="compare-tickers" id="compareTickers"></div>
+  <button class="compare-btn" id="compareBtn" onclick="startCompare()" disabled>Compare</button>
+  <button class="clear-compare" onclick="clearCompare()">Clear</button>
+</div>
+
+<div class="screener-view" id="screenerView">
+  <div class="table-wrap">
+    <div class="table-container">
+      <div class="table-header" id="tableHeader">
+        <div class="col-check"></div>
+        <div class="col-ticker" data-sort="ticker">Ticker</div>
+        <div class="col-name" data-sort="name">Name</div>
+        <div class="col-score" data-sort="composite">Score</div>
+        <div class="col-tier" data-sort="tier">Tier</div>
+        <div class="col-signal" data-sort="signal">Signal</div>
+        <div class="col-tech" data-sort="tech_score">Tech</div>
+        <div class="col-price" data-sort="price">Price</div>
+      </div>
+      <div id="tableBody">
+      <div style="padding:3rem 1rem;text-align:center;color:var(--muted)">
+        <div style="font-size:1.1rem;margin-bottom:0.5rem">Loading 70 tickers...</div>
+        <div style="width:120px;height:3px;background:var(--border);border-radius:2px;margin:1rem auto;overflow:hidden">
+          <div style="width:40%;height:100%;background:var(--text);border-radius:2px;animation:loadSlide 1.5s ease-in-out infinite"></div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+</div>
+
+<div class="comparison-view" id="comparisonView">
+  <div class="comparison-header">
+    <h2>Comparison</h2>
+    <button class="detail-btn" onclick="backToScreener()">Back to Screener</button>
+  </div>
+  <div class="comparison-grid" id="comparisonGrid"></div>
+</div>
+
+<!-- Preview card -->
+<div class="preview-card" id="previewCard">
+  <h4 id="previewTitle">—</h4>
+  <div class="preview-metrics" id="previewMetrics"></div>
+  <canvas id="previewSparkline" width="240" height="60"></canvas>
+  <div class="preview-thesis" id="previewThesis">—</div>
+</div>
+
+<!-- Full page detail view -->
+<div class="detail-view" id="detailView">
+  <div class="detail-nav">
+    <button class="back-btn" onclick="closeDetail()">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>
+      Back
+    </button>
+    <div class="nav-title">
+      <h2 id="detailTicker">—</h2>
+      <div class="detail-meta" id="detailMeta">—</div>
+    </div>
+    <div class="nav-actions">
+      <button class="detail-btn" id="detailCompareBtn" onclick="addToCompareFromDetail()">+ Compare</button>
+      <button class="detail-btn" onclick="openRawMarkdown()">Raw Report</button>
+      <button class="nav-close" onclick="closeDetail()">&times;</button>
+    </div>
+  </div>
+  <div class="detail-body" id="detailBody">
+    <!-- Chart -->
+    <div class="chart-container">
+      <canvas id="priceChart"></canvas>
+    </div>
+    <!-- Pillar scores visual -->
+    <div class="pillar-scores" id="pillarScores"></div>
+
+    <!-- Accordion sections -->
+    <div class="accordion-item open" data-section="executive">
+      <div class="accordion-header" onclick="toggleAccordion(this)">
+        <h3>Executive Summary</h3>
+        <span class="accordion-icon">&#9662;</span>
+      </div>
+      <div class="accordion-content" id="accordion-executive"></div>
+    </div>
+
+    <div class="accordion-item open" data-section="scores">
+      <div class="accordion-header" onclick="toggleAccordion(this)">
+        <h3>Score Summary</h3>
+        <span class="accordion-icon">&#9662;</span>
+      </div>
+      <div class="accordion-content" id="accordion-scores"></div>
+    </div>
+
+    <div class="accordion-item" data-section="critical">
+      <div class="accordion-header" onclick="toggleAccordion(this)">
+        <h3>Critical Note</h3>
+        <span class="accordion-icon">&#9662;</span>
+      </div>
+      <div class="accordion-content" id="accordion-critical"></div>
+    </div>
+
+    <div class="accordion-item" data-section="triggers">
+      <div class="accordion-header" onclick="toggleAccordion(this)">
+        <h3>Re-Evaluation Triggers</h3>
+        <span class="accordion-icon">&#9662;</span>
+      </div>
+      <div class="accordion-content" id="accordion-triggers"></div>
+    </div>
+
+    <div class="accordion-item" data-section="rationales">
+      <div class="accordion-header" onclick="toggleAccordion(this)">
+        <h3>Sub-Pillar Rationales</h3>
+        <span class="accordion-icon">&#9662;</span>
+      </div>
+      <div class="accordion-content" id="accordion-rationales"></div>
+    </div>
+
+    <div class="accordion-item" data-section="valuation">
+      <div class="accordion-header" onclick="toggleAccordion(this)">
+        <h3>Valuation Model</h3>
+        <span class="accordion-icon">&#9662;</span>
+      </div>
+      <div class="accordion-content" id="accordion-valuation"></div>
+    </div>
+
+    <div class="accordion-item" data-section="sources">
+      <div class="accordion-header" onclick="toggleAccordion(this)">
+        <h3>Sources</h3>
+        <span class="accordion-icon">&#9662;</span>
+      </div>
+      <div class="accordion-content" id="accordion-sources"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let DATA = [];
+let sortCol = 'composite';
+let sortDir = -1;
+let priceChartInstance = null;
+let currentTicker = null;
+let compareList = new Set();
+
+const TIERS = ['Core Holding', 'Satellite', 'Watchlist', 'Avoid'];
+const COUNTRIES = ['CN', 'HK', 'JP', 'TW', 'GB', 'US', 'SG'];
+const TIER_COLORS = {
+  'Core Holding': '#ffffff',
+  'Satellite': '#aaaaaa',
+  'Watchlist': '#888888',
+  'Avoid': '#666666'
+};
+
+// Load data
+fetch('data.json')
+  .then(r => r.json())
+  .then(data => {
+    DATA = data;
+    initFilters();
+    renderStats();
+    renderTable();
+  });
+
+function initFilters() {
+  const tierPills = document.getElementById('filterTierPills');
+  tierPills.innerHTML = TIERS.map(t =>
+    `<span class="filter-pill active" data-tier="${t}" onclick="toggleTierPill(this)">${t}</span>`
+  ).join('');
+
+  const countryPills = document.getElementById('filterCountryPills');
+  countryPills.innerHTML = COUNTRIES.map(c =>
+    `<span class="filter-pill active" data-country="${c}" onclick="toggleCountryPill(this)">${c}</span>`
+  ).join('');
+}
+
+function toggleTierPill(el) {
+  el.classList.toggle('active');
+  renderTable();
+}
+function toggleCountryPill(el) {
+  el.classList.toggle('active');
+  renderTable();
+}
+
+function renderStats() {
+  const counts = { 'Core Holding': 0, 'Satellite': 0, 'Watchlist': 0, 'Avoid': 0 };
+  let avgScore = 0;
+  DATA.forEach(d => { counts[d.tier] = (counts[d.tier] || 0) + 1; avgScore += d.composite || 0; });
+  avgScore = (avgScore / DATA.length).toFixed(2);
+
+  const html = `
+    <div class="stat-card"><span class="label">Total</span><span class="value">${DATA.length}</span></div>
+    <div class="stat-card core"><span class="label">Core</span><span class="value">${counts['Core Holding']}</span></div>
+    <div class="stat-card satellite"><span class="label">Sat</span><span class="value">${counts['Satellite']}</span></div>
+    <div class="stat-card watchlist"><span class="label">Watch</span><span class="value">${counts['Watchlist']}</span></div>
+    <div class="stat-card avoid"><span class="label">Avoid</span><span class="value">${counts['Avoid']}</span></div>
+    <div class="stat-card"><span class="label">Avg</span><span class="value">${avgScore}</span></div>
+  `;
+  document.getElementById('statsBar').innerHTML = html;
+}
+
+function getFiltered() {
+  const activeTiers = Array.from(document.querySelectorAll('#filterTierPills .filter-pill.active')).map(el => el.dataset.tier);
+  const activeCountries = Array.from(document.querySelectorAll('#filterCountryPills .filter-pill.active')).map(el => el.dataset.country);
+  const scoreMin = parseFloat(document.getElementById('filterScoreMin').value);
+  const signal = document.getElementById('filterSignal').value;
+  const search = document.getElementById('filterSearch').value.toLowerCase();
+
+  return DATA.filter(d => {
+    if (!activeTiers.includes(d.tier)) return false;
+    if (!activeCountries.includes(d.country)) return false;
+    if ((d.composite || 0) < scoreMin) return false;
+    if (signal && d.signal !== signal) return false;
+    if (search && !d.ticker.toLowerCase().includes(search) && !d.name.toLowerCase().includes(search)) return false;
+    return true;
+  }).sort((a, b) => {
+    const av = a[sortCol] || 0;
+    const bv = b[sortCol] || 0;
+    if (typeof av === 'string') return sortDir * av.localeCompare(bv);
+    return sortDir * (av - bv);
+  });
+}
+
+function renderTable() {
+  const rows = getFiltered();
+
+  if (rows.length === 0) {
+    document.getElementById('tableBody').innerHTML = `
+      <div style="padding:3rem 1rem;text-align:center;color:var(--muted)">
+        <div style="font-size:1.1rem;margin-bottom:0.5rem">No tickers match your filters</div>
+        <button class="empty-state-btn" onclick="clearAllFilters()">Clear Filters</button>
+      </div>
+    `;
+    return;
+  }
+
+  document.querySelectorAll('#tableHeader > div[data-sort]').forEach(h => {
+    h.classList.remove('sorted', 'asc');
+    if (h.dataset.sort === sortCol) {
+      h.classList.add('sorted');
+      if (sortDir === 1) h.classList.add('asc');
+    }
+  });
+
+  const html = rows.map(d => {
+    const tierClass = 'tier-' + d.tier.toLowerCase().replace(' ', '-');
+    const signalClass = 'signal-' + (d.signal || 'none').toLowerCase();
+    const scoreColor = getScoreColor(d.composite);
+    const scorePct = Math.min(100, (d.composite / 5) * 100);
+    const priceStr = d.price ? d.price.toFixed(2) : '—';
+    const hasReport = d.report && d.report.has_scorecard;
+    const reportIcon = hasReport
+      ? `<svg class="report-icon has-report" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM9 1v4h4.5L9 1z"/></svg>`
+      : `<svg class="report-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM9 1v4h4.5L9 1z"/></svg>`;
+    const isSelected = compareList.has(d.ticker);
+
+    return `
+      <div class="table-row ${isSelected ? 'selected' : ''}" data-ticker="${d.ticker}"
+           tabindex="0" role="button" aria-label="${d.ticker} ${d.name}, composite ${d.composite}, ${d.tier}"
+           onclick="handleRowClick(event, '${d.ticker}')"
+           onkeydown="handleRowKey(event, '${d.ticker}')"
+           onmouseenter="showPreview(event, '${d.ticker}')"
+           onmouseleave="hidePreview()">
+        <label class="col-check" onclick="event.stopPropagation()">
+          <input type="checkbox" onchange="toggleCompare('${d.ticker}')" ${isSelected ? 'checked' : ''} aria-label="Compare ${d.ticker}">
+        </label>
+        <div class="col-ticker">${reportIcon}${d.ticker}</div>
+        <div class="col-name">${d.name}</div>
+        <div class="col-score">
+          <div class="score-bar-wrap">
+            <div class="score-bar-track"><div class="score-bar-fill" style="width:${scorePct}%;background:${scoreColor}"></div></div>
+            <span class="score-bar-text" style="color:${scoreColor}">${d.composite}</span>
+          </div>
+        </div>
+        <div class="col-tier"><span class="tier-badge ${tierClass}">${d.tier}</span></div>
+        <div class="col-signal ${signalClass}"><span class="signal-dot"></span><span class="signal-text">${d.signal || '—'}</span></div>
+        <div class="col-tech">${d.tech_score.toFixed(1)}</div>
+        <div class="col-price">${priceStr} ${d.currency !== '?' ? d.currency : ''}</div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('tableBody').innerHTML = html;
+}
+
+function getScoreColor(score) {
+  if (score >= 3.8) return '#ffffff';
+  if (score >= 3.0) return '#aaaaaa';
+  if (score >= 2.0) return '#888888';
+  return '#666666';
+}
+
+function handleRowClick(event, ticker) {
+  if (event.target.closest('.col-check')) return;
+  openDetail(ticker);
+}
+
+function handleRowKey(event, ticker) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    openDetail(ticker);
+  } else if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    const rows = document.querySelectorAll('.table-row');
+    const idx = Array.from(rows).findIndex(r => r.dataset.ticker === ticker);
+    if (idx >= 0 && idx < rows.length - 1) rows[idx + 1].focus();
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    const rows = document.querySelectorAll('.table-row');
+    const idx = Array.from(rows).findIndex(r => r.dataset.ticker === ticker);
+    if (idx > 0) rows[idx - 1].focus();
+  }
+}
+
+// Preview card
+function showPreview(event, ticker) {
+  if (window.innerWidth < 768) return;
+  const d = DATA.find(x => x.ticker === ticker);
+  if (!d) return;
+
+  const card = document.getElementById('previewCard');
+  document.getElementById('previewTitle').textContent = `${d.ticker} — ${d.name}`;
+
+  const metricsHtml = `
+    <div class="preview-metric"><div class="label">Composite</div><div class="value" style="color:${getScoreColor(d.composite)}">${d.composite}</div></div>
+    <div class="preview-metric"><div class="label">Yield</div><div class="value" style="color:${d.div_yield ? 'var(--text)' : 'var(--muted)'}">${d.div_yield || 'N/A'}</div></div>
+    <div class="preview-metric"><div class="label">Payout</div><div class="value">${d.payout_ratio || '—'}</div></div>
+    <div class="preview-metric"><div class="label">MOS</div><div class="value">${d.dcf_mos || '—'}</div></div>
+  `;
+  document.getElementById('previewMetrics').innerHTML = metricsHtml;
+  document.getElementById('previewThesis').textContent = d.key_finding || 'No key finding available.';
+
+  const canvas = document.getElementById('previewSparkline');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const hist = d.price_history || [];
+  if (hist.length > 10) {
+    const prices = hist.slice(-30).map(h => h.price);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const range = max - min || 1;
+    ctx.beginPath();
+    ctx.strokeStyle = getScoreColor(d.composite);
+    ctx.lineWidth = 2;
+    prices.forEach((p, i) => {
+      const x = (i / (prices.length - 1)) * canvas.width;
+      const y = canvas.height - ((p - min) / range) * (canvas.height - 10) - 5;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+
+  // Position card relative to viewport, not the row
+  const rect = event.currentTarget.getBoundingClientRect();
+  let left = rect.right + 16;
+  let top = rect.top;
+  const cardWidth = 260;
+  const cardHeight = 200;
+  if (left + cardWidth > window.innerWidth - 16) {
+    left = Math.max(16, rect.left - cardWidth - 16);
+  }
+  if (top + cardHeight > window.innerHeight - 16) {
+    top = window.innerHeight - cardHeight - 16;
+  }
+  if (top < 16) top = 16;
+  card.style.left = left + 'px';
+  card.style.top = top + 'px';
+  card.classList.add('visible');
+}
+
+function hidePreview() {
+  document.getElementById('previewCard').classList.remove('visible');
+}
+
+// Comparison
+function toggleCompare(ticker) {
+  if (compareList.has(ticker)) {
+    compareList.delete(ticker);
+  } else {
+    if (compareList.size >= 4) {
+      showToast('Maximum 4 tickers for comparison');
+      return;
+    }
+    compareList.add(ticker);
+  }
+  updateCompareBar();
+  renderTable();
+}
+
+function showToast(message) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:var(--card);color:var(--text);padding:0.6rem 1.2rem;border-radius:4px;border:1px solid var(--border);z-index:1000;font-size:0.9rem;opacity:0;transition:opacity 0.3s;pointer-events:none;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.style.opacity = '1';
+  setTimeout(() => { toast.style.opacity = '0'; }, 2500);
+}
+
+function clearAllFilters() {
+  document.querySelectorAll('#filterTierPills .filter-pill').forEach(el => el.classList.add('active'));
+  document.querySelectorAll('#filterCountryPills .filter-pill').forEach(el => el.classList.add('active'));
+  document.getElementById('filterScoreMin').value = 0;
+  document.getElementById('scoreMinVal').textContent = '0';
+  document.getElementById('filterSignal').value = '';
+  document.getElementById('filterSearch').value = '';
+  renderTable();
+}
+
+function addToCompareFromDetail() {
+  if (currentTicker) toggleCompare(currentTicker);
+  updateCompareBar();
+}
+
+function updateCompareBar() {
+  const bar = document.getElementById('compareBar');
+  const tickersDiv = document.getElementById('compareTickers');
+  const btn = document.getElementById('compareBtn');
+
+  if (compareList.size === 0) {
+    bar.classList.remove('visible');
+    return;
+  }
+
+  bar.classList.add('visible');
+  tickersDiv.innerHTML = Array.from(compareList).map(t =>
+    `<span class="compare-ticker-tag">${t}</span>`
+  ).join('');
+  btn.disabled = compareList.size < 2;
+}
+
+function clearCompare() {
+  compareList.clear();
+  updateCompareBar();
+  renderTable();
+}
+
+function startCompare() {
+  if (compareList.size < 2) return;
+  const tickers = Array.from(compareList);
+  const items = tickers.map(t => DATA.find(d => d.ticker === t)).filter(Boolean);
+
+  document.getElementById('screenerView').classList.add('hidden');
+  document.getElementById('comparisonView').classList.add('active');
+
+  const grid = document.getElementById('comparisonGrid');
+  grid.innerHTML = items.map(d => `
+    <div class="comparison-card">
+      <h3>${d.ticker} — ${d.name}</h3>
+      <div class="pillar-scores" style="grid-template-columns:repeat(3,1fr);margin-bottom:0.75rem;">
+        <div class="pillar-box"><div class="label">Composite</div><div class="score" style="color:${getScoreColor(d.composite)}">${d.composite}</div></div>
+        <div class="pillar-box"><div class="label">Screener</div><div class="score">${d.screener_total}</div></div>
+        <div class="pillar-box"><div class="label">Technical</div><div class="score">${d.tech_score.toFixed(1)}</div></div>
+      </div>
+      <div style="font-size:0.8rem;color:var(--muted);">
+        <div>Price: ${d.price ? d.price.toFixed(2) : '—'} ${d.currency}</div>
+        <div>Yield: ${d.div_yield || '—'} | Payout: ${d.payout_ratio || '—'}</div>
+        <div>Signal: ${d.signal || '—'} | MOS: ${d.dcf_mos || '—'}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function backToScreener() {
+  document.getElementById('screenerView').classList.remove('hidden');
+  document.getElementById('comparisonView').classList.remove('active');
+}
+
+// Full page detail view
+function openDetail(ticker) {
+  const d = DATA.find(x => x.ticker === ticker);
+  if (!d) return;
+  currentTicker = ticker;
+
+  document.getElementById('detailTicker').textContent = `${d.ticker} — ${d.name}`;
+  document.getElementById('detailMeta').textContent = `${d.country} · ${d.exchange} · ${d.industry} · ${d.yf_symbol}`;
+
+  // Render price chart
+  renderPriceChart(d);
+
+  // Pillar scores visual
+  const pillarHtml = `
+    <div class="pillar-box"><div class="label">Composite</div><div class="score" style="color:${getScoreColor(d.composite)}">${d.composite}</div><div class="bar-track"><div class="bar-fill" style="width:${(d.composite/5)*100}%"></div></div></div>
+    <div class="pillar-box"><div class="label">Screener v5</div><div class="score">${d.screener_total}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.min(100,(d.screener_total/10)*100)}%"></div></div></div>
+    <div class="pillar-box"><div class="label">Technical</div><div class="score" style="color:${getTechColor(d.tech_score)}">${d.tech_score.toFixed(1)}</div><div class="bar-track"><div class="bar-fill" style="width:${(d.tech_score/5)*100}%"></div></div></div>
+    <div class="pillar-box"><div class="label">RSI</div><div class="score">${d.rsi || '—'}</div><div class="bar-track"><div class="bar-fill" style="width:${d.rsi || 0}%"></div></div></div>
+    <div class="pillar-box"><div class="label">52W</div><div class="score">${d.w52_pct ? d.w52_pct + '%' : '—'}</div><div class="bar-track"><div class="bar-fill" style="width:${d.w52_pct || 0}%"></div></div></div>
+  `;
+  document.getElementById('pillarScores').innerHTML = pillarHtml;
+
+  // Parse markdown sections
+  const md = d.report && d.report.scorecard_md ? d.report.scorecard_md : '';
+  const sections = parseMarkdownSections(md);
+
+  document.getElementById('accordion-executive').innerHTML = sections.executive
+    ? `<div class="markdown-content">${marked.parse(sections.executive)}</div>`
+    : '<p style="color:var(--muted)">No executive summary available.</p>';
+
+  document.getElementById('accordion-scores').innerHTML = sections.scores
+    ? `<div class="markdown-content">${marked.parse(sections.scores)}</div>`
+    : '<p style="color:var(--muted)">No score summary available.</p>';
+
+  document.getElementById('accordion-critical').innerHTML = sections.critical
+    ? `<div class="markdown-content">${marked.parse(sections.critical)}</div>`
+    : '<p style="color:var(--muted)">No critical note available.</p>';
+
+  document.getElementById('accordion-triggers').innerHTML = sections.triggers
+    ? `<div class="markdown-content">${marked.parse(sections.triggers)}</div>`
+    : '<p style="color:var(--muted)">No re-evaluation triggers available.</p>';
+
+  document.getElementById('accordion-rationales').innerHTML = sections.rationales
+    ? `<div class="markdown-content">${marked.parse(sections.rationales)}</div>`
+    : '<p style="color:var(--muted)">No sub-pillar rationales available.</p>';
+
+  document.getElementById('accordion-sources').innerHTML = sections.sources
+    ? `<div class="markdown-content">${marked.parse(sections.sources)}</div>`
+    : '<p style="color:var(--muted)">No sources available.</p>';
+
+  // Valuation
+  const valMd = d.report && d.report.valuation_md ? d.report.valuation_md : '';
+  document.getElementById('accordion-valuation').innerHTML = valMd
+    ? `<div class="markdown-content">${marked.parse(valMd)}</div>`
+    : '<p style="color:var(--muted)">No valuation model available.</p>';
+
+  // Reset accordions
+  document.querySelectorAll('.accordion-item').forEach(item => {
+    item.classList.toggle('open', item.dataset.section === 'executive' || item.dataset.section === 'scores');
+  });
+
+  // Show detail view, hide screener
+  document.getElementById('screenerView').classList.add('hidden');
+  document.getElementById('detailView').classList.add('active');
+  document.getElementById('filterBar').classList.add('hidden');
+  document.getElementById('statsBar').classList.add('hidden');
+  document.getElementById('compareBar').classList.add('hidden');
+
+  // Scroll to top
+  window.scrollTo(0, 0);
+}
+
+function renderPriceChart(d) {
+  const ctx = document.getElementById('priceChart').getContext('2d');
+
+  if (priceChartInstance) {
+    priceChartInstance.destroy();
+    priceChartInstance = null;
+  }
+
+  const hist = d.price_history || [];
+  if (hist.length < 2) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    return;
+  }
+
+  const labels = hist.map(h => {
+    const date = new Date(h.date);
+    return `${date.getMonth()+1}/${date.getDate()}`;
+  });
+  const prices = hist.map(h => h.price);
+  const sma50 = hist.map(h => h.sma50).filter(v => v != null);
+  const sma200 = hist.map(h => h.sma200).filter(v => v != null);
+
+  const datasets = [{
+    label: 'Price',
+    data: prices,
+    borderColor: '#ffffff',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1.5,
+    fill: true,
+    tension: 0.3,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+    order: 0
+  }];
+
+  if (sma50.length > 0) {
+    datasets.push({
+      label: '50 DMA',
+      data: hist.map(h => h.sma50),
+      borderColor: '#aaaaaa',
+      borderWidth: 1,
+      borderDash: [4, 4],
+      pointRadius: 0,
+      fill: false,
+      tension: 0.3,
+      order: 1
+    });
+  }
+
+  if (sma200.length > 0) {
+    datasets.push({
+      label: '200 DMA',
+      data: hist.map(h => h.sma200),
+      borderColor: '#666666',
+      borderWidth: 1,
+      borderDash: [2, 2],
+      pointRadius: 0,
+      fill: false,
+      tension: 0.3,
+      order: 2
+    });
+  }
+
+  priceChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          align: 'end',
+          labels: {
+            color: '#888888',
+            font: { family: 'Raleway', size: 10 },
+            boxWidth: 12,
+            usePointStyle: true,
+            pointStyle: 'line'
+          }
+        },
+        tooltip: {
+          backgroundColor: '#111111',
+          titleColor: '#ffffff',
+          bodyColor: '#aaaaaa',
+          borderColor: '#333333',
+          borderWidth: 1,
+          padding: 10,
+          displayColors: true,
+        }
+      },
+      scales: {
+        x: {
+          display: false,
+          grid: { display: false }
+        },
+        y: {
+          grid: { color: '#333333', drawBorder: false },
+          ticks: {
+            color: '#888888',
+            font: { family: 'Raleway', size: 10 },
+            callback: function(value) { return value.toFixed(0); }
+          }
+        }
+      }
+    }
+  });
+}
+
+function closeDetail() {
+  document.getElementById('screenerView').classList.remove('hidden');
+  document.getElementById('detailView').classList.remove('active');
+  document.getElementById('filterBar').classList.remove('hidden');
+  document.getElementById('statsBar').classList.remove('hidden');
+  document.getElementById('compareBar').classList.remove('hidden');
+
+  if (priceChartInstance) {
+    priceChartInstance.destroy();
+    priceChartInstance = null;
+  }
+
+  if (currentTicker) {
+    const row = document.querySelector(`.table-row[data-ticker="${currentTicker}"]`);
+    if (row) row.focus();
+  }
+  currentTicker = null;
+}
+
+function parseMarkdownSections(md) {
+  const sections = {};
+  if (!md) return sections;
+
+  const execMatch = md.match(/## Executive Summary\s*\n([\s\S]*?)(?=\n## |\n### |$)/i);
+  if (execMatch) sections.executive = execMatch[1].trim();
+
+  const scoreMatch = md.match(/## Score Summary\s*\n([\s\S]*?)(?=\n## |\n### |$)/i);
+  if (scoreMatch) sections.scores = '## Score Summary\n\n' + scoreMatch[1].trim();
+
+  const critMatch = md.match(/## Critical Note\s*\n([\s\S]*?)(?=\n## |\n### |$)/i);
+  if (critMatch) sections.critical = '## Critical Note\n\n' + critMatch[1].trim();
+
+  const trigMatch = md.match(/## Re-Evaluation Triggers\s*\n([\s\S]*?)(?=\n## |\n### |$)/i);
+  if (trigMatch) sections.triggers = '## Re-Evaluation Triggers\n\n' + trigMatch[1].trim();
+
+  const ratMatch = md.match(/## Sub-Pillar Rationales\s*\n([\s\S]*?)(?=\n## |\n### |$)/i);
+  if (ratMatch) sections.rationales = '## Sub-Pillar Rationales\n\n' + ratMatch[1].trim();
+
+  const srcMatch = md.match(/## Sources\s*\n([\s\S]*?)$/i);
+  if (srcMatch) sections.sources = '## Sources\n\n' + srcMatch[1].trim();
+
+  return sections;
+}
+
+function toggleAccordion(header) {
+  const item = header.closest('.accordion-item');
+  item.classList.toggle('open');
+}
+
+function openRawMarkdown() {
+  const d = DATA.find(x => x.ticker === currentTicker);
+  if (!d || !d.report || !d.report.scorecard_path) return;
+  const path = d.report.scorecard_path.replace('dividend-screener/', '');
+  window.open(path, '_blank');
+}
+
+function getTechColor(score) {
+  if (score >= 3.5) return '#ffffff';
+  if (score >= 2) return '#aaaaaa';
+  return '#888888';
+}
+
+// Event listeners
+document.getElementById('filterScoreMin').addEventListener('input', e => {
+  document.getElementById('scoreMinVal').textContent = e.target.value;
+  renderTable();
+});
+document.getElementById('filterSignal').addEventListener('change', renderTable);
+document.getElementById('filterSearch').addEventListener('input', renderTable);
+
+document.getElementById('tableHeader').addEventListener('click', e => {
+  const col = e.target.dataset.sort;
+  if (!col) return;
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = -1; }
+  renderTable();
+});
+
+// Keyboard navigation
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeDetail();
+    backToScreener();
+  }
+});
+</script>
+
+</body>
+</html>
